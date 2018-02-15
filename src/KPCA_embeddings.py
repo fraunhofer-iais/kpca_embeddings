@@ -27,10 +27,16 @@ from os.path import expanduser
 import termcolor
 from unidecode import unidecode
 import argparse
+from lingpy.compare.strings import bisim1
+
 
 def similarity_function_tup(tup):
     a,b = tup
-    return similarity_function(a,b)
+    if similarity_function.__name__ == "sorensen_plus":
+
+        return sorensen_plus(ng1,ng2)
+    else:
+        return similarity_function(a,b)
 
 def normalize_word(w):
     return unidecode(w.lower())
@@ -40,8 +46,10 @@ def ngrams(s, n):
     string = " "+s+" "
     return list(set([string[i:i+n] for i in range(len(string)-n+1)]))
 
-#This function takes two lists of n-grams
-def sorensen_plus(ng1,ng2):     
+#This function takes two words
+def sorensen_plus(a,b):     
+    ng1 = [ngrams(a, i) for i in range(1,min(len(a),len(b)))]
+    ng2 = [ngrams(b, i) for i in range(1,min(len(a),len(b)))]
     N = min(len(ng1),len(ng2))            
     return 1 - np.sum(distance.sorensen(ng1[i], ng2[i]) for i in range(N))/ N
 
@@ -60,7 +68,7 @@ def projectWordTup(tup):
     else:              
         k = np.exp(-hyperparam * (pair_sim**2))             
 
-
+    return k.dot(alphas / lambdas)
 
 
 '''
@@ -70,9 +78,10 @@ Parsing user arguments
 argParser = argparse.ArgumentParser(description="KPCA embeddings training script", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 argParser.add_argument('--repr', type=str,help="Representative words (use a subset of your vocabulary if it is too large for your memory restrictions)", action='store',required=False)
 argParser.add_argument('--vocab', type=str,help="Vocabulary path", action='store',required=True)
+argParser.add_argument('--sim', type=str,help="Similarity function: 'bisim1' (bigram similarity),'sorensen_plus' (Sørensen–Dice index for n-grams )(default: 'sorensen_plus' )", action='store',required=False, default = "sorensen_plus")
 argParser.add_argument('--kernel', type=str,help="Kernel: 'poly','rbf' (default: 'poly' )", action='store',required=False, default = "poly")
 argParser.add_argument('--hyperparam', type=float,help="Hyperparameter for the selected kernel: sigma for RBF kernel and the degree for the polynomial kernel (default 2)", action='store',required=False, default = 2)
-argParser.add_argument('--max_ngram', type=int,help="Maximum length of the n-grams considered by the similarity function (default 2)", action='store',required=False, default = 2)
+argParser.add_argument('--max_ngram', type=int,help="Maximum length of the n-grams considered by the bigram similarity function (default 2)", action='store',required=False, default = 2)
 argParser.add_argument('--size', type=int,help="Number of principal components of the embeddings (default 1500)", action='store',required=False, default= 1500)
 argParser.add_argument('--cores', type=int,help="Number of processes to be started for computation (default: number of available cores)", action='store',required=False, default= multiprocessing.cpu_count())
 argParser.add_argument('--output', type=str,help="Output folder for the KPCA embeddings (default: current folder)", action='store',required=False, default= ".")
@@ -89,8 +98,7 @@ cores = args.cores
 outputPath = args.output
 
 #Similarity function to be used as dot product for KPCA
-similarity_function = sorensen_plus
-
+similarity_function = args.sim
 
 if reprPath == None:
     reprPath = vocabPath
@@ -146,7 +154,7 @@ lambdas = [eigvals[-i] for i in range(1,n_components+1)]
 
 
 pickle.dump( alphas, open( outputPath+"/alphas_{}_{}_{}_{}_{}.p".format(similarity_function.__name__, len(reprVocab),kernel, hyperparam, n_components), "wb" ) )
-pickle.dump( lambdas, open( outputPath+"/lambdas_freq_vocab_nl_{}_{}_{}_{}_{}.p".format(similarity_function.__name__, len(reprVocab),kernel, hyperparam, n_components), "wb" ) )     
+pickle.dump( lambdas, open( outputPath+"/lambdas_{}_{}_{}_{}_{}.p".format(similarity_function.__name__, len(reprVocab),kernel, hyperparam, n_components), "wb" ) )     
 
 
 '''
