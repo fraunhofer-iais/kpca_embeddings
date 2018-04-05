@@ -32,11 +32,7 @@ from lingpy.compare.strings import bisim1
 
 def similarity_function_tup(tup):
     a,b = tup
-    if similarity_function.__name__ == "sorensen_plus":
-
-        return sorensen_plus(ng1,ng2)
-    else:
-        return similarity_function(a,b)
+    return similarity_function(a,b)
 
 def normalize_word(w):
     return unidecode(w.lower())
@@ -48,11 +44,10 @@ def ngrams(s, n):
 
 #This function takes two words
 def sorensen_plus(a,b):     
-    ng1 = [ngrams(a, i) for i in range(1,min(len(a),len(b)))]
-    ng2 = [ngrams(b, i) for i in range(1,min(len(a),len(b)))]
+    ng1 = [ngrams(a, i) for i in range(1,min(len(a),len(b))+1)]
+    ng2 = [ngrams(b, i) for i in range(1,min(len(a),len(b))+1)]
     N = min(len(ng1),len(ng2))            
     return 1 - np.sum(distance.sorensen(ng1[i], ng2[i]) for i in range(N))/ N
-
 
 def projectWordTup(tup):
     word    = tup[0]
@@ -98,7 +93,7 @@ cores = args.cores
 outputPath = args.output
 
 #Similarity function to be used as dot product for KPCA
-similarity_function = args.sim
+similarity_function = eval(args.sim)
 
 if reprPath == None:
     reprPath = vocabPath
