@@ -15,17 +15,12 @@
 
 import numpy as np
 import multiprocessing
-from scipy import exp
 from scipy.linalg import eigh
-from sklearn import linear_model
-import logging
-import sys
 import codecs
 import pickle
 import distance
 from os.path import expanduser
 import termcolor
-from unidecode import unidecode
 import argparse
 from lingpy.compare.strings import bisim1
 
@@ -35,7 +30,7 @@ def similarity_function_tup(tup):
     return similarity_function(a,b)
 
 def normalize_word(w):
-    return unidecode(w.lower())
+    return w.lower()
 
 
 def ngrams(s, n):
@@ -53,9 +48,8 @@ def projectWordTup(tup):
     word    = tup[0]
     tuples  = tup[1]
     hyperparam   = tup[2]
-    alphas  = tup[3]
-    lambdas = tup[4]
-    kernel = tup[5]
+    alphas_lambdas_div  = tup[3]
+    kernel = tup[4]
 
     pair_sim = np.array([similarity_function(word,t) for t in tuples])
     if kernel == "poly":        
@@ -63,7 +57,7 @@ def projectWordTup(tup):
     else:              
         k = np.exp(-hyperparam * (pair_sim**2))             
 
-    return k.dot(alphas / lambdas)
+    return k.dot(alphas_lambdas_div)
 
 
 '''
@@ -100,10 +94,10 @@ if reprPath == None:
 
 '''
 Preprocessing
+
 '''
 with codecs.open(reprPath, "r") as fIn:
-        reprVocab = [  normalize_word(w[:-1]) for w in fIn if len(w[:-1].split()) ==1]        
-        
+        reprVocab = [  normalize_word(w[:-1]) for w in fIn if len(w[:-1].split()) ==1]
 
 termcolor.cprint("Generating word pairs\n", "blue")
 reprVocabLen = len(reprVocab)
@@ -130,7 +124,7 @@ Kernel Principal Component Analysis
 termcolor.cprint("Solving eigevector/eigenvalues problem\n", "blue")
 
 if kernel == "rbf":    
-    K = exp(-hyperparam * (simMatrix**2))
+    K = np.exp(-hyperparam * (simMatrix**2))
 else: #poly
     distMatrix = np.ones(len(simMatrix))- simMatrix
     K = distMatrix**hyperparam
@@ -160,7 +154,9 @@ with codecs.open(vocabPath, "r") as fIn:
 
 termcolor.cprint("Projecting known vocabulary to KPCA embeddings\n", "blue")
 
-X_train = pool.map(projectWordTup, [(word,reprVocab, hyperparam,alphas, lambdas, kernel) for word in vocab] )  
+#X_train = pool.map(projectWordTup, [(word,reprVocab, hyperparam,alphas, lambdas, kernel) for word in vocab] )  
+alphas_lambdas_div = alphas / lambdas
+X_train = pool.map(projectWordTup, [(word,reprVocab, hyperparam, alphas_lambdas_div, kernel) for word in vocab] )  
 
 pickle.dump( X_train, open(outputPath+"/KPCA_{}_{}_{}_{}_{}.p".format(similarity_function.__name__, len(reprVocab),kernel,hyperparam, n_components), "wb" ) )
 
