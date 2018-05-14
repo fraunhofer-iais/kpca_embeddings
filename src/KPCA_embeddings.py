@@ -123,7 +123,7 @@ simMatrixMode = args.sim_matrix
 
 #Similarity function to be used as dot product for KPCA
 def similarity_function(a,b):
-    if args.sim == "ngram":
+    if args.sim == "ngram_sim":
         return 1-eval(args.sim)(a,b,args.n_ngram)
     else:
         return 1-eval(args.sim)(a,b)
