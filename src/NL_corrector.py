@@ -24,7 +24,8 @@ from unidecode import unidecode
 import scipy
 import json
 from os.path import expanduser
-import lingpy.compare.strings
+import pyximport; pyximport.install()
+import similarity
 import re
 from num2words import num2words
 
@@ -58,53 +59,6 @@ def ngrams(s, n):
     return list(set([string[i:i+n] for i in range(len(string)-n+1)]))
 
 
-# In[3]:
-
-def similarity(s1,s2):
-    ngrams1 = [ngrams(s1,j) for j in range(2,  min( len(s1)+1 , MAX_NGRAM))  ]  
-    ngrams2 = [ngrams(s2,j) for j in range(2,  min( len(s2)+1 , MAX_NGRAM))  ]  
-    N = min(len(ngrams1),len(ngrams2))+1        
-    ngramMatches = np.array([len(np.intersect1d(ngrams1[i], ngrams2[i])) for i in range(N-1)])
-    ngramLens1 = np.array([len(ngrams1[i] ) for i in range(N-1)] )
-    ngramLens2 = np.array([len(ngrams2[i] ) for i in range(N-1)] )
-
-    ngramMatchesLen = len(ngramMatches)
-    if ngramMatchesLen > 0:
-        return sum(2* ngramMatches / (ngramLens1 +ngramLens2) )/ ngramMatchesLen
-    else:
-        return 0
-
-
-def similarity_ngram(tup):
-    ngrams1, ngrams2 = tup
-    N = min(len(ngrams1),len(ngrams2))+1        
-    ngramMatches = np.array([len(np.intersect1d(ngrams1[i], ngrams2[i])) for i in range(N-1)])
-    ngramLens1 = np.array([len(ngrams1[i] ) for i in range(N-1)] )
-    ngramLens2 = np.array([len(ngrams2[i] ) for i in range(N-1)] )
-
-    ngramMatchesLen = len(ngramMatches)
-    if ngramMatchesLen > 0:
-        return sum(2* ngramMatches / (ngramLens1 +ngramLens2) )/ ngramMatchesLen
-    else:
-        return 0
-
-def projectWordTup(tup):
-    word    = tup[0]
-    tokens  = tup[1]
-    gamma   = tup[2]
-    alphas  = tup[3]
-    lambdas = tup[4]
-    kernel = tup[5]
-    
-    
-    pair_dist = np.array([similarity(word,t) for t in tokens])
-    if kernel == "poly":        
-        k = pair_dist**gamma
-    else:        
-        k = np.exp(-gamma * ((np.ones(len(pair_dist)) - pair_dist)**2))             
-    
-    return k.dot(alphas / lambdas)
-
 def similarity_function_tup(tup):
     a,b = tup
     return similarity_function(a,b)
@@ -137,18 +91,12 @@ def detectRunOnError(word, vocab):
             return w1,w2
     return w1, ""
 
-
-#HOME = expanduser("~")
 HOME = "../"
-
-
 
 MAX_NGRAM = 2
 
-#sys.path.append("../lingpy") 
-
-similarity_function = lingpy.compare.strings.bisim1
-sim_func = "bisim1"
+similarity_function = similarity.ngram_sim
+sim_func = "bisim"
 vocabSize = 3000
 n_components = 2000
 
@@ -176,12 +124,11 @@ with open(HOME+'/data/lambdas_freq_vocab_nl_{}_{}_poly_2_{}.p'.format(sim_func,v
 
 
 jsonPath = HOME+ "/data/test/"
-resultPath = HOME+ "/results/"
+resultPath = HOME+ "/data/results/"
 correctionDict = {}
 wordsDict = {}
 previousWord = None
 for filename in os.listdir(jsonPath):
-#for filename in ["page1062.json"]:
     if filename[-5:] == ".json":        
         with codecs.open(jsonPath+filename, "r", encoding="utf-8") as inFile:
             with codecs.open(resultPath+filename, "w", encoding="utf-8") as outFile:
