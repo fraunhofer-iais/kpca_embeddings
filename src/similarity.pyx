@@ -1,70 +1,41 @@
-"""
-Similarity functions implemented in cython
-"""
-#import pyximport; pyximport.install()
+#   Copyright 2018 Fraunhofer IAIS
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 import numpy as np
-from libc.stdlib cimport malloc, free
-import multiprocessing 
-from scipy.spatial.distance import cosine
 
-pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-
-cdef chain(*iterables):
-    """Make an iterator that returns elements from the first iterable
-    until it is exhausted, then proceeds to the next iterable, until
-    all of the iterables are exhausted. Used for treating consecutive
-    sequences as a single sequence.
+cdef ngrams(s, int n):
+    """List of ngrams of the string s after prepending and appending a filler (repetitions included). Order of ngrams is kept .
     """
-    for it in iterables:
-        for element in it:
-            yield element
+    cdef int i
+    s2 = " "+s+" "        
+    return [s2[i:i+n] for i in range(len(s2)-n+1)]
 
-cpdef double bisim1(a, b, normalized=True) except? -1:
-    """computes the binary version of bigram similarity.
+cpdef double ngram_sim(x, y, int n= 2) except? -1:
+    """Binary version of n-gram similarity
     """
-    cdef int i,j,la,lb,n,count
+    cdef int x_len,y_len,i,j
+
+    x_len = len(x)
+    y_len = len(y)
+    ng_a = ngrams(x,n)
+    ng_b = ngrams(y,n)
+
+    np_mem = np.zeros([x_len + 1, y_len + 1], dtype=np.intc)
+    cdef int [:,:] mem_table = np_mem
+
+    for i in range(1, x_len + 1):
+        for j in range(1, y_len + 1):
+            mem_table[i][j] = max(mem_table[i][j - 1], mem_table[i - 1][j], mem_table[i - 1][j - 1] + (ng_a[i - 1] == ng_b[j - 1]) )
     
-    pad_symbol = "-"
-
-    n = 2    
-    la = len(a) + 1
-    lb = len(b) + 1
-    s_a = chain((pad_symbol,) * (n - 1), a)
-    s_a = chain(s_a, (pad_symbol,) * (n - 1))
-    s_a = list(s_a)
-    s_b = chain((pad_symbol,) * (n - 1), b)
-    s_b = chain(s_b, (pad_symbol,) * (n - 1))
-    s_b = list(s_b)
-    count = max(0, len(s_a) - n + 1)
-    s_a = [tuple(s_a[i:i + n]) for i in range(count)]
-    count = max(0, len(s_b) - n + 1)
-    s_b = [tuple(s_b[i:i + n]) for i in range(count)]
-
-    m_np = np.zeros([la, lb], dtype=np.intc)
-    cdef int [:,:] m = m_np
-
-    for i in range(1, la):
-        for j in range(1, lb):
-            if (s_a[i - 1] == s_b[j - 1]):
-                m[i][j] = m[i - 1][j - 1] + 1
-            else:
-                m[i][j] = max(m[i][j - 1], m[i - 1][j])
-    la = la - 1
-    lb = lb - 1
-    if not normalized:
-        return  float(m[la][lb]) - float(max(la, lb))
-    return float(m[la][lb]) / float(max(la, lb))
-
-
-cdef projectWord(word, kpcaModel, maxoids , degree=2):
-    pair_sim = np.array([ bisim1(word,t) for t in maxoids])
-    k = pair_sim**degree
-    return k.dot(alphas / lambdas)
-
-cpdef most_similar(w, kpcaModel, maxoids, topn=10):   
-    v1 = projectWord(w)    
-   
-    D = np.array([(t, cosine(v1, kpcaModel[t])  ) for t in kpcaModel ])    
-
-    D_sorted= sorted(D, key=lambda tup: float(tup[1]))
-    return D_sorted[:topn]
+    return float(mem_table[x_len][y_len]) / float(max(x_len, y_len))
