@@ -26,10 +26,10 @@ cpdef double ngram_sim(x, y, int n= 2) except? -1:
     """
     cdef int x_len,y_len,i,j
 
-    x_len = len(x)
-    y_len = len(y)
     ng_a = ngrams(x,n)
     ng_b = ngrams(y,n)
+    x_len = len(ng_a)
+    y_len = len(ng_b)
 
     np_mem = np.zeros([x_len + 1, y_len + 1], dtype=np.intc)
     cdef int [:,:] mem_table = np_mem
